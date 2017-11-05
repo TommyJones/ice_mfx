@@ -1,0 +1,37 @@
+---
+title: "Marginal Effects Estimation from Idividual Conditional Expectation"
+author: "Thomas W. Jones"
+date: '`r format(Sys.Date(), "%B %d, %Y")`'
+output: html_document
+---
+
+```{r setup, include=FALSE}
+rm(list = ls())
+knitr::opts_chunk$set(echo = FALSE)
+```
+
+# Introduction
+
+# Methods
+
+### No interactions
+
+### One simple interaction
+
+### Complex interactions
+
+# Simulation of Linear Model
+
+## Linear Regression
+
+## Random Forest
+
+# Simulation of Logistic Model
+
+## Logistic Regression
+
+## Random Forest
+
+# Actual Data
+
+# Conclusion
