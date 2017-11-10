@@ -287,7 +287,7 @@ plot.Mfx <- function(mfx, type = c("response", "derivative"), centered = FALSE, 
   
 }
 
-summary.Mfx_list <- function(mfx_list){
+summary.Mfx_list <- function(mfx_list, print = TRUE){
   tab <- do.call(rbind, lapply(mfx_list, function(x){
     data.frame(variable = paste(rep(x$varname, length(x$mfx)), names(x$mfx)),
               effect = x$mfx,
@@ -300,11 +300,15 @@ summary.Mfx_list <- function(mfx_list){
   
   tab <- cbind(tab, conf)
   
-  print(tab)
+  if(print){
+    print(tab)
+  } else{
+    tab
+  }
 }
 
 print.Mfx_list <- function(mfx_list){
-  summary(mfx_list)
+  summary(mfx_list, print = TRUE)
 }
 
 
