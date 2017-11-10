@@ -15,9 +15,9 @@ source("R/00_common_functions.R")
 set.seed(666)
 
 # Some continuous variables
-x1 <- rnorm(n = 1000, mean = 1, sd = 2)
-x2 <- rnorm(n = 1000, mean = 1.5, sd = 2.5)
-x3 <- rnorm(n = 1000, mean = .6, sd = 1.5)
+x1 <- rnorm(n = 10000, mean = 1, sd = 2)
+x2 <- rnorm(n = 10000, mean = 1.5, sd = 2.5)
+x3 <- rnorm(n = 10000, mean = .6, sd = 1.5)
 
 # Round them to three decimal places to ease computation downstream
 x1 <- round(x1, 3)
@@ -27,7 +27,7 @@ x3 <- round(x3, 3)
 z <- 1 + 1.2 * x1 + 4.5 * x2 + 2.8 * x3 + 4.2 * x1 * x3 - 2 * x2 ^ 2
 
 # linear combination
-y_linear <- z + rnorm(n = 1000, mean = 0, sd = 1)
+y_linear <- z + rnorm(n = 10000, mean = 0, sd = 1)
 
 # binomial combination
 y_logit <- rbinom(10000,1, prob = 1 / (1 + exp(-z)))
