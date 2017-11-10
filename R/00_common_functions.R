@@ -492,5 +492,9 @@ Factor2Binary <- function(y){
   
   colnames(Y) <- ynames
   
+  # model.matrix always makes the first column all "1", fix this
+  Y[ , 1 ] <- as.numeric(rowSums(Y[ , -1 ]) == 0)
+  
+  
   Y
 }
