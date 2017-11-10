@@ -89,27 +89,66 @@ mfx_rf_linear <- CalcMfx(object = rf_linear,
 
 ### Create nerural network linear and logistic models --------------------------
 
-# nn_linear <- nnet::nnet(y_linear ~ x1 + x2 + x3,
-#                         data = X, size = 2)
+library(magrittr)
+library("keras")
 
-nn_logit <- nnet::nnet(y_logit ~ x1 + x2 + x3,
-                        data = X, size = 2,
-                       entropy = TRUE)
+FitNn <- function(y, x, activation) {
+  
+  x <- as.matrix(x)
+  y <- matrix(y, ncol = 1)
+  
+  net <- keras_model_sequential()
+  
+  net %>% 
+    layer_dense(units = 3, activation = activation, input_shape = ncol(x)) %>% 
+    layer_dropout(rate = 0.4) %>% 
+    layer_dense(units = 2, activation = activation) %>% 
+    layer_dropout(rate = 0.4) %>% 
+    layer_dense(units = ncol(y), activation = activation)
+  
+  summary(net)
+  
+  net %>% compile(
+    loss = 'mean_squared_error',
+    optimizer = optimizer_rmsprop(),
+    metrics = c('accuracy')
+  )
+  
+  history <- net %>% fit(
+    x = x, y = y, 
+    epochs = 70, batch_size = 128, 
+    validation_split = 0.2
+  )
+  
+  net
+}
+
+nn_linear <- FitNn(y = X$y_linear, x = X[ , grep("^x", colnames(X), value = T) ],
+                   activation = "linear")
+
+nn_logit <- FitNn(y = X$y_logit, x = X[ , grep("^x", colnames(X), value = T) ],
+                  activation = "sigmoid")
+
+PredictNn <- function(object, newdata) {
+  # re-calculating interactions for ICE plots
+  # newdata <- RePrep(newdata)
+  
+  as.numeric(predict(object, as.matrix(newdata)))
+}
+
 
 ### N. Net ICE curves ----------------------------------------------------------
 
-PredictNnBinom <- function(object, newdata) {
-  predict(object, newdata, type = "raw")[ , 1 ]
-}
+mfx_nn_linear <- CalcMfx(object = nn_linear, 
+                         X = X_test[ , grep("^x", colnames(X), value = T) ], 
+                         pred_fun = PredictNn,
+                         predictors = grep("^x", colnames(X_test), value = T),
+                         cpus = 1)
 
-mfx_nn_logit <- CalcMfx(object = nn_logit,
-                        X = X_test,
-                        pred_fun = PredictNnBinom,
-                        predictors = c("x1", "x2", "x3"))
-
-# mfx_nn_linear <- CalcMfx(object = nn_linear, 
-#                          X = X_test,
-#                          pred_fun = PredictNnLinear,
-#                          predictors = c("x1", "x2", "x3"))
+mfx_nn_logit <- CalcMfx(object = nn_logit, 
+                        X = X_test[ , grep("^x", colnames(X), value = T) ], 
+                        pred_fun = PredictNn,
+                        predictors = grep("^x", colnames(X_test), value = T),
+                        cpus = 1)
 
 save.image("data_derived/no_interactions.RData")
