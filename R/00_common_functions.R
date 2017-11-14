@@ -498,3 +498,38 @@ Factor2Binary <- function(y){
   
   Y
 }
+
+Standardize <- function(x, sd_x = NULL, mean_x = NULL){
+  
+  if(is.null(sd_x) | is.null(mean_x)){
+    # remove any columns for which there is no variation
+    sd_x <- apply(x, 2, function(y) sd(y, na.rm = TRUE))
+    
+    x <- x[ , sd_x > 0 ]
+    
+    sd_x <- sd_x[ sd_x > 0 ]
+    
+    # get means to store
+    mean_x <- colMeans(x, na.rm = TRUE)
+    
+    # standardize 
+    result <- apply(x, 2, function(y){
+      (y - mean(y, na.rm = TRUE)) / sd(y, na.rm = TRUE)
+    })
+    
+    # return result
+    return(list(data = result, 
+                sd_x = sd_x,
+                mean_x = mean_x))
+  } else {
+    
+    result <- mapply(function(d, m, s){
+      (d - m) / s
+    }, d = as.list(x[ , names(mean_x) ]), m = mean_x, s = sd_x,
+    SIMPLIFY = FALSE)
+    
+    return(as.data.frame(result, stringsAsFactors = FALSE))
+    
+  }
+
+}
