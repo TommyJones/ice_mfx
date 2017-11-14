@@ -91,8 +91,42 @@ Resample <- function(vec, weights){
          replace = TRUE)
 }
 
+FitLogit <- function(y, x){
+  
+  # standardize x
+  # xstd <- Standardize(x = x)
+  # 
+  # # make a formula
+  # f <- as.formula(paste("mais3pl ~ - 1 +", paste(colnames(xstd$data), collapse = " + ")))
+  # 
+  # # get a training set
+  # d <- as.data.frame(cbind(mais3pl = y, xstd$data), stringsAsFactors = FALSE)
+  
+  # make a formula
+  f <- as.formula(paste("mais3pl ~ - 1 +", paste(colnames(x), collapse = " + ")))
+
+  # get a training set
+  d <- as.data.frame(cbind(mais3pl = y, x), stringsAsFactors = FALSE)
+  
+  
+  # train logistic
+  result <- glm(formula = f, data = d, family = binomial("logit"), x = TRUE)
+  
+  result$x_mean <- xstd$mean_x
+  result$x_sd <- xstd$sd_x
+  
+  result
+}
+
 # logistic regression
 PredictLogit <- function(object, newdata) {
+  
+  # standardize inputs
+  # newdata <- newdata[ , names(object$x_mean) ]
+  # 
+  # newdata <- Standardize(x = newdata,
+  #                        sd_x = object$x_sd,
+  #                        mean_x = object$x_mean)
   
   # re-calculating interactions for ICE plots
   # newdata <- RePrep(newdata)
@@ -108,13 +142,15 @@ model_logit <- parallel::mclapply(cv, function(x){
   X <- csdata[ samp , setdiff(names(csdata), c("mais3pl", "ratwgt2")) ]
   y <- csdata[ samp, "mais3pl" ]
   
-  f <- as.formula(paste("mais3pl ~ -1 +", paste(colnames(X), collapse = " + ")))
+  # f <- as.formula(paste("mais3pl ~ -1 +", paste(colnames(X), collapse = " + ")))
   
-  model <- glm(f, data = cbind(mais3pl = y, X), x = TRUE, family = binomial("logit"))
+  # model <- glm(f, data = cbind(mais3pl = y, X), x = TRUE, family = binomial("logit"))
+  
+  model <- FitLogit(y = y, x = X)
   
   samp <- Resample(x$test, csdata[ x$test, "ratwgt2" ])
   
-  p <- predict(model, newdata = csdata[ samp , colnames(X) ], type = "response")
+  p <- PredictLogit(object = model, newdata = csdata[ samp, colnames(X) ])
   
   result <- CalcClassificationStats(predicted_probabilities = p, 
                                     true_values = csdata[ samp , "mais3pl" ])
