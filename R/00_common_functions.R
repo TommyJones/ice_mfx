@@ -312,14 +312,15 @@ print.Mfx_list <- function(mfx_list){
 }
 
 
+# Declare a function to calculate AUC
+Trapezoid <- function(x,y){
+  len = length(x)
+  w <- x[2:len] - x[1:(len-1)]
+  h <- (y[2:len] + y[1:(len-1)])/2
+  sum(h*w)
+}
+
 CalcClassificationStats <- function(predicted_probabilities, true_values){
-  # Declare a function to calculate AUC
-  Trapezoid <- function(x,y){
-    len = length(x)
-    w <- x[2:len] - x[1:(len-1)]
-    h <- (y[2:len] + y[1:(len-1)])/2
-    sum(h*w)
-  }
   
   # error checking
   if( length(unique(true_values)) != 2){
