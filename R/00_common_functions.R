@@ -71,7 +71,7 @@ CalcMfx <- function(object, X, pred_fun = predict, predictors = colnames(X),
       
       ### More research is needed to get factors right...
       # since each level of p represents a binary variable, I think I can just
-      # take rowMeans of yhat to get the marginal effect. But I need to do more work
+      # take rowMeans of yhat to get the marginal effect. But I'm probably wrong
       
       # dy <- yhat
       
@@ -120,6 +120,10 @@ CalcMfx <- function(object, X, pred_fun = predict, predictors = colnames(X),
       is_factor <- FALSE
     }
   
+    # get intercept for plotting
+    X[[ p ]] <- 0
+    
+    intercept <- mean(pred_fun(object, X), na.rm = TRUE)
     
     # return the result
     result <- list(mfx = mfx, conf = conf,
@@ -128,6 +132,7 @@ CalcMfx <- function(object, X, pred_fun = predict, predictors = colnames(X),
                    x = pts,
                    yh0 = yh0,
                    varname = p,
+                   intercept = intercept,
                    is_factor = is_factor)
     
     class(result) <- "Mfx"
@@ -228,8 +233,7 @@ plot.Mfx <- function(mfx, type = c("response", "derivative"), centered = FALSE, 
     
     plotmat <- apply(plotmat, 2, cumsum)
     
-    mfx_pred <- mfx$x * mfx$mfx + 
-      mean(plotmat[ which.min(abs(mfx$x)) , ], na.rm = TRUE) 
+    mfx_pred <- mfx$x * mfx$mfx + mfx$intercept 
     
     ylab <- "partial y-hat"
     
