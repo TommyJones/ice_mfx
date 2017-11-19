@@ -73,8 +73,9 @@ RePrep <- function(newdata) {
 model_linear <- lm(y_linear ~ x1 + x2 + x3 + x1x3 + x2sq, data = X) 
 
 # misspecified model
-model_linear_all <- lm(y_linear ~ x1 + x2 + x3 + x1x2 + x1x3 + x2x3 + 
-                         x1sq + x2sq + x3sq, data = X)
+model_linear_all <- FitLasso(y = X$y_linear, 
+                             x = X[ , setdiff(names(X), c("y_logit", "y_linear"))],
+                             family = "gaussian")
 
 # predict function
 PredictLinear <- function(object, newdata) {
@@ -96,12 +97,8 @@ model_logit$mfx <- erer::maBina(w = model_logit,
                                 x.mean = FALSE) # x.mean = FALSE averages mfx across data points
 
 # misspecified model
-model_logit_all <- glm(y_logit ~ x1 + x2 + x3 + x1x2 + x1x3 + x2x3 + 
-                          x1sq + x2sq + x3sq, data = X,
-                        family = binomial("logit"), x = TRUE)
+model_logit_all <- FitLasso(y = X$y_logit, x = X[ , setdiff(names(X), c("y_logit", "y_linear"))])
 
-model_logit_all$mfx <- erer::maBina(w = model_logit_all, 
-                                    x.mean = FALSE) # x.mean = FALSE averages mfx across data points
 
 # predict function
 PredictLogit <- function(object, newdata) {
@@ -194,14 +191,16 @@ PredictNn <- function(object, newdata) {
 mfx_linear <- CalcMfx(object = model_linear, X = X_test, pred_fun = PredictLinear,
                       predictors = c("x1", "x2", "x3", "x1x3", "x2sq"))
 
-mfx_linear_all <- CalcMfx(object = model_linear_all, X = X_test, pred_fun = PredictLinear,
-                          predictors = grep("^x", colnames(X_test), value = T))
+mfx_linear_all <- CalcMfx(object = model_linear_all, 
+                          X = X_test[ , grep("^x", colnames(X_test), value = T) ], 
+                          pred_fun = PredictLasso)
 
 mfx_logit <- CalcMfx(object = model_logit, X = X_test, pred_fun = PredictLogit,
                      predictors = intersect(names(X_test), colnames(model_logit$x)))
 
-mfx_logit_all <- CalcMfx(object = model_logit_all, X = X_test, pred_fun = PredictLogit,
-                          predictors = grep("^x", colnames(X_test), value = T))
+mfx_logit_all <- CalcMfx(object = model_logit_all, 
+                         X = X_test[ , grep("^x", colnames(X_test), value = T) ], 
+                         pred_fun = PredictLasso)
 
 mfx_rf_linear <- CalcMfx(object = rf_linear, X = X_test, pred_fun = PredictRf,
                          predictors = grep("^x", colnames(X_test), value = T))
