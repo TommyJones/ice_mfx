@@ -550,3 +550,34 @@ CalcR2 <- function(y, yhat) {
   1 - sse / sst
   
 }
+
+
+### Recyclable functions for fitting and predicting things ---------------------
+# lasso
+FitLasso <- function(y, x, family = "binomial"){
+  glmnet::glmnet(y = y, x = as.matrix(x), family = family)
+}
+
+PredictLasso <- function(object, newdata, type = "response"){
+  out <- predict(object, as.matrix(newdata), type = type)
+  out[ , ncol(out)]
+}
+
+# random forest
+FitRf <- function(y, x){
+  # will automatically do regression or classification depending on format of y
+  randomForest::randomForest(y = y, x = x)
+}
+
+PredictRf <- function(object, newdata) {
+  
+  # will automatically predict linear or logit probabilities depending on format
+  # of object
+  result <- try(predict(object, newdata, type = "vote")[ , "1" ],
+                silent = TRUE)
+  
+  if(class(result) == "try-error")
+    result <- predict(object, newdata)
+  
+  result
+}
