@@ -53,6 +53,8 @@ X_test <- X[ 1:1000 , ]
 X <- X[ -1 * 1:1000 , ]
 
 ### Get a function to re-prepare interactions for ICE --------------------------
+# Edit: don't do this. It causes you to get poor coefficient estimates. I guess
+# when they say "all else constant" they really mean it!
 RePrep <- function(newdata) {
   newdata$x1x2 <- newdata$x1 * newdata$x2
   newdata$x1x3 <- newdata$x1 * newdata$x3
