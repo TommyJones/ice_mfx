@@ -123,8 +123,6 @@ CalcMfx <- function(object, X, pred_fun = predict, predictors = colnames(X),
     # get intercept for plotting
     X[[ p ]] <- 0
     
-    intercept <- mean(pred_fun(object, X), na.rm = TRUE)
-    
     # return the result
     result <- list(mfx = mfx, conf = conf,
                    dy = dy,
@@ -132,7 +130,6 @@ CalcMfx <- function(object, X, pred_fun = predict, predictors = colnames(X),
                    x = pts,
                    yh0 = yh0,
                    varname = p,
-                   intercept = intercept,
                    is_factor = is_factor)
     
     class(result) <- "Mfx"
@@ -233,7 +230,12 @@ plot.Mfx <- function(mfx, type = c("response", "derivative"), centered = FALSE, 
     
     plotmat <- apply(plotmat, 2, cumsum)
     
-    mfx_pred <- mfx$x * mfx$mfx + mfx$intercept 
+    ice_mean <- rowMeans(plotmat)
+    
+    # get intercept for mfx line
+    int <- ice_mean[ which.min(abs(mfx$x)) ] - mfx$mfx * mfx$x[ which.min(abs(mfx$x)) ]
+    
+    mfx_pred <- mfx$x * mfx$mfx + int
     
     ylab <- "partial y-hat"
     
