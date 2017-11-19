@@ -147,8 +147,8 @@ plot.Mfx_list <- function(mfx_list, ...) {
   
   # run plots, pausing between
   for (j in seq_along(mfx_list)) {
+    par(ask = ask)
     plot(mfx_list[[ j ]], ...)
-    par(ask = TRUE)
   }
   
   # return par to previous setting
@@ -157,7 +157,7 @@ plot.Mfx_list <- function(mfx_list, ...) {
 }
 
 
-plot.Mfx <- function(mfx, type = c("response", "derivative"), centered = FALSE, ...){
+plot.Mfx <- function(mfx, type = c("response", "derivative"), centered = FALSE, ask = TRUE, ...){
 
   ### Below still only works with one variable
   
