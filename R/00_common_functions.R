@@ -534,3 +534,13 @@ Standardize <- function(x, sd_x = NULL, mean_x = NULL){
   }
 
 }
+
+CalcR2 <- function(y, yhat) {
+  
+  sse <- sum((y - yhat) ^ 2)
+  
+  sst <- sum((y - mean(y)) ^ 2)
+  
+  1 - sse / sst
+  
+}
