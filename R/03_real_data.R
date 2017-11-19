@@ -19,6 +19,9 @@ vehicle_characteristics <- c("curbwgt_kg", "btype")
 occupant_characteristics <- c("belt_use", "age", "height", "weight", "bmi", 
                               "seatrack", "seatpos")
 
+# offset from centerline variables measured in absolute value
+csdata$dvd <- abs(csdata$dvd)
+
 # quadratic terms
 csdata$delta_v_sq <- csdata$delta_v ^ 2 
 
@@ -46,6 +49,12 @@ csdata$i_dv_dvl <- csdata$delta_v * csdata$dvl
 csdata$i_dv_dvd <- csdata$delta_v * csdata$dvd
 
 csdata$i_dvl_dvd <- as.numeric(csdata$dvl * csdata$dvd)
+
+csdata$i_dv_beltuse <- csdata$delta_v * csdata$belt_use
+
+csdata$i_beltuse_pdo1 <- csdata$belt_use * csdata$pdo1
+
+csdata$i_beltuse_dvd <- csdata$belt_use * csdata$dvd
 
 i_terms <- grep("^i_", names(csdata), value = TRUE)
 
@@ -91,74 +100,31 @@ Resample <- function(vec, weights){
          replace = TRUE)
 }
 
-FitLogit <- function(y, x){
-  
-  # standardize x
-  # xstd <- Standardize(x = x)
-  # 
-  # # make a formula
-  # f <- as.formula(paste("mais3pl ~ - 1 +", paste(colnames(xstd$data), collapse = " + ")))
-  # 
-  # # get a training set
-  # d <- as.data.frame(cbind(mais3pl = y, xstd$data), stringsAsFactors = FALSE)
-  
-  # make a formula
-  f <- as.formula(paste("mais3pl ~ - 1 +", paste(colnames(x), collapse = " + ")))
-
-  # get a training set
-  d <- as.data.frame(cbind(mais3pl = y, x), stringsAsFactors = FALSE)
-  
-  
-  # train logistic
-  result <- glm(formula = f, data = d, family = binomial("logit"), x = TRUE)
-  
-  result$x_mean <- xstd$mean_x
-  result$x_sd <- xstd$sd_x
-  
-  result
+FitLasso <- function(y, x){
+  glmnet::glmnet(y = y, x = as.matrix(x), family = "binomial")
 }
 
-# logistic regression
-PredictLogit <- function(object, newdata) {
-  
-  # standardize inputs
-  # newdata <- newdata[ , names(object$x_mean) ]
-  # 
-  # newdata <- Standardize(x = newdata,
-  #                        sd_x = object$x_sd,
-  #                        mean_x = object$x_mean)
-  
-  # re-calculating interactions for ICE plots
-  # newdata <- RePrep(newdata)
-  
-  # new model
-  predict(object, newdata, type = "response")
-  
+PredictLasso <- function(object, newdata){
+  out <- predict(object, as.matrix(newdata), type = "response")
+  out[ , ncol(out)]
 }
 
-model_logit <- parallel::mclapply(cv, function(x){
+model_lasso <- parallel::mclapply(cv, function(x){
   samp <- Resample(x$training, csdata[ x$training, "ratwgt2" ])
   
   X <- csdata[ samp , setdiff(names(csdata), c("mais3pl", "ratwgt2")) ]
   y <- csdata[ samp, "mais3pl" ]
   
-  # f <- as.formula(paste("mais3pl ~ -1 +", paste(colnames(X), collapse = " + ")))
-  
-  # model <- glm(f, data = cbind(mais3pl = y, X), x = TRUE, family = binomial("logit"))
-  
-  model <- FitLogit(y = y, x = X)
+  model <- FitLasso(y = y, x = X)
   
   samp <- Resample(x$test, csdata[ x$test, "ratwgt2" ])
   
-  p <- PredictLogit(object = model, newdata = csdata[ samp, colnames(X) ])
+  p <- PredictLasso(object = model, newdata = csdata[ samp, colnames(X) ])
   
   result <- CalcClassificationStats(predicted_probabilities = p, 
                                     true_values = csdata[ samp , "mais3pl" ])
   
 }, mc.cores = 4)
-
-
-
 
 # random forest
 PredictRf <- function(object, newdata) {
@@ -175,7 +141,7 @@ PredictRf <- function(object, newdata) {
   result
 }
 
-rf_logit <- parallel::mclapply(cv, function(x){
+model_rf <- parallel::mclapply(cv, function(x){
   samp <- Resample(x$training, csdata[ x$training, "ratwgt2" ])
   
   X <- csdata[ samp , setdiff(names(csdata), c("mais3pl", "ratwgt2")) ]
@@ -218,14 +184,14 @@ FitNn <- function(y, x, activation = "sigmoid", epochs = 50) {
     layer_dropout(rate = 0.4) %>%
     # layer_dense(units = 6, activation = activation) %>% 
     # layer_dropout(rate = 0.4) %>% 
-    layer_dense(units = 4, activation = activation) %>% 
-    layer_dropout(rate = 0.4) %>% 
+    # layer_dense(units = 4, activation = activation) %>% 
+    # layer_dropout(rate = 0.4) %>% 
     layer_dense(units = ncol(y), activation = "sigmoid")
   
   # summary(net)
   
   net %>% compile(
-    loss = 'mean_squared_error',
+    loss = 'binary_crossentropy',
     optimizer = optimizer_rmsprop(),
     metrics = c('accuracy')
   )
@@ -246,13 +212,13 @@ PredictNn <- function(object, newdata) {
   as.numeric(predict(object, as.matrix(newdata)))
 }
 
-nn_logit <- lapply(cv, function(x){
+model_nn <- lapply(cv, function(x){
   samp <- Resample(x$training, csdata[ x$training, "ratwgt2" ])
   
   X <- csdata[ samp , setdiff(names(csdata), c("mais3pl", "ratwgt2")) ]
   y <- csdata[ samp, "mais3pl" ]
   
-  model <- FitNn(y = y, x = X, activation = "sigmoid", epochs = 30)
+  model <- FitNn(y = y, x = X, activation = "relu", epochs = 30)
   
   samp <- Resample(x$test, csdata[ x$test, "ratwgt2" ])
 
@@ -264,8 +230,61 @@ nn_logit <- lapply(cv, function(x){
 })
 
 # aggregate results into a list
+model_accuracy <- list(lasso = model_lasso,
+                       rf = model_rf,
+                       nn = model_nn)
 
 ### Get final models for each type ---------------------------------------------
 
-# get training rows
+# get training and testing sets
+set.seed(666)
 
+test_rows <- sample(1:nrow(csdata), round(.2 * nrow(csdata)))
+
+X_training <- csdata[ -test_rows , ]
+
+X_test <- csdata[ test_rows , ]
+
+# resample
+samp <- Resample(rownames(X_training), weights = X_training$ratwgt2)
+
+X_training <- X_training[ samp , ]
+
+samp <- Resample(rownames(X_test), weights = X_test$ratwgt2)
+
+X_test <- X_test[ samp , ]
+
+# logistic 
+model_lasso <- FitLasso(y = X_training$mais3pl, 
+                        x = X_training[ , setdiff(names(X_training), c("mais3pl", "ratwgt2"))])
+
+mfx_lasso <- CalcMfx(object = model_lasso, 
+                     X = X_test[ , setdiff(names(X_test), c("mais3pl", "ratwgt2")) ],
+                     pred_fun = PredictLasso,
+                     predictors = setdiff(names(X_test), c("mais3pl", "ratwgt2")))
+
+# random forest
+model_rf <- randomForest::randomForest(y = as.factor(X_training$mais3pl), 
+                        x = X_training[ , setdiff(names(X_training), c("mais3pl", "ratwgt2"))])
+
+mfx_rf <- CalcMfx(object = model_rf, 
+                  X = X_test[ , setdiff(names(X_test), c("mais3pl", "ratwgt2")) ],
+                  pred_fun = PredictRf,
+                  predictors = setdiff(names(X_test), c("mais3pl", "ratwgt2")))
+
+
+# deep neural net
+model_nn <- FitNn(y = X_training$mais3pl, 
+                  x = X_training[ , setdiff(names(X_training), c("mais3pl", "ratwgt2"))],
+                  activation = "relu")
+
+mfx_nn <- CalcMfx(object = model_nn, 
+                  X = X_test[ , setdiff(names(X_test), c("mais3pl", "ratwgt2")) ],
+                  pred_fun = PredictNn,
+                  predictors = setdiff(names(X_test), c("mais3pl", "ratwgt2")),
+                  cpus = 1)
+
+save(model_accuracy, 
+     model_lasso, model_rf, model_nn, 
+     mfx_lasso, mfx_rf, mfx_nn,
+     file = "data_derived/real_data.RData")
