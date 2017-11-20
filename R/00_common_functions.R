@@ -140,7 +140,7 @@ CalcMfx <- function(object, X, pred_fun = predict, predictors = colnames(X),
   
 }
 
-plot.Mfx_list <- function(mfx_list, ...) {
+plot.Mfx_list <- function(mfx_list, ask = TRUE, ...) {
   
   # get current par setting
   opar <- par()
@@ -157,7 +157,7 @@ plot.Mfx_list <- function(mfx_list, ...) {
 }
 
 
-plot.Mfx <- function(mfx, type = c("response", "derivative"), centered = FALSE, ask = TRUE, ...){
+plot.Mfx <- function(mfx, type = c("response", "derivative"), centered = FALSE, ...){
 
   ### Below still only works with one variable
   
