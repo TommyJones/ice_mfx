@@ -117,7 +117,7 @@ rf_linear <- randomForest::randomForest(y_linear ~ x1 + x2 + x3 + x1x2 + x1x3 + 
                                           x1sq + x2sq + x3sq,
                                         data = X)
 
-rf_logit <- randomForest::randomForest(y = factor(X$y_logit),
+rf_logit <- randomForest::randomForest(y = factor(X$y_logit, levels = c("0", "1")),
                                        x = X[ , grep("^x", colnames(X), value = TRUE) ])
 
 PredictRf <- function(object, newdata) {
@@ -126,7 +126,7 @@ PredictRf <- function(object, newdata) {
   # newdata <- RePrep(newdata)
   
   # new model
-  result <- try(predict(object, newdata, type = "vote")[ , 1 ])
+  result <- try(predict(object, newdata, type = "vote")[ , "1" ])
   
   if(class(result) == "try-error")
     result <- predict(object, newdata)
