@@ -2,3 +2,6 @@ packrat/lib*/
 .Rproj.user
 .Rhistory
 .RData
+plots_and_such.html
+plots_and_such_files
+plots_and_such_cache
