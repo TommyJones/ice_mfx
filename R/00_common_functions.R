@@ -8,19 +8,19 @@ Derivative <- function(y, x){
 }
 
 CalcMfx <- function(object, X, pred_fun = predict, predictors = colnames(X), 
-                    max_pts = 100, ...){
+                    max_pts = 100, dydx_mean = TRUE, ...){
   
   ### Check consistency of inputs ----
-
-  ### Prepare some global variables ----
-
-  ### Do assuming 1 predictor and expand later ----
+  # TODO
+  
+  
+  ### Gets to calculating! ----
   if (length(predictors) > 1) {
     
     result <- textmineR::TmParallelApply(predictors, function(p){
       CalcMfx(object = object, X = X, pred_fun = pred_fun, predictors = p,
-              max_pts = max_pts)
-    }, export = c("object", "X", "pred_fun", "max_pts"), ...)
+              max_pts = max_pts, dydx_mean = dydx_mean)
+    }, export = c("object", "X", "pred_fun", "max_pts", "dydx_mean"), ...)
     
     names(result) <- predictors
     
@@ -43,6 +43,9 @@ CalcMfx <- function(object, X, pred_fun = predict, predictors = colnames(X),
       
       pts <- seq(min(X[[ p ]]), max(X[[ p ]]), length.out = max_pts)
       
+      # add a lower bound so we can get non-infinate values for
+      # delta x and delta y at the bottom
+      pts <- c(pts[ 1 ] - mean(diff(pts)), pts)
     }
     
     # get predictions for each point in the sequence
@@ -51,7 +54,7 @@ CalcMfx <- function(object, X, pred_fun = predict, predictors = colnames(X),
       X_new <- X
       
       X_new[[ p ]] <- point
-
+      
       yhat <- pred_fun(object, X_new)
       
       yhat
@@ -100,35 +103,74 @@ CalcMfx <- function(object, X, pred_fun = predict, predictors = colnames(X),
       rownames(conf) <- names(mfx)
       
       is_factor <- TRUE
-
+      
     } else {
+      # dy/dx of curves
       dy <- apply(yhat, 2, function(y) c(NA, diff(y)))
       
       dx <- c(NA, diff(pts))
       
       dydx <- dy / dx
       
+      # dy/dx of true values
+      small_x <- sapply(X[[ p ]], function(x) max(pts[ pts < x ], na.rm = T))
+      
+      dx_true <- X[[ p ]] - small_x
+      
+      X_new <- X
+      X_new[[ p ]] <- small_x
+      
+      yhat_true <- pred_fun(object, X)
+      
+      dy_true <- yhat_true - pred_fun(object, X_new)
+      
+      dydx_true <- dy_true / dx_true
+      
       # get the mfx
-      mfx <- mean(dydx, na.rm = TRUE)
+      if (dydx_mean) {
+        # If you want to use mean values of the curves
+        mfx <- mean(dydx, na.rm = TRUE)
+        
+        stdd <- sd(dydx, na.rm = TRUE)
+        
+        se <- stdd / sqrt(length(dydx))
+        
+        # confidence interval (totally overconfident, does not account for non-linearity)
+        conf <- c(mfx - 1.96 * se,
+                  mfx + 1.96 * se)
+      } else {
+        # If you only want to consider values at actual data points
+        # dy/dx of true values
+        
+        mfx <- mean(dydx_true, na.rm = TRUE)
+        
+        stdd <- sd(dydx_true, na.rm = TRUE)
+        
+        se <- stdd / sqrt(length(dydx_true))
+        
+        # confidence interval (totally overconfident, does not account for non-linearity)
+        conf <- c(mfx - 1.96 * se,
+                  mfx + 1.96 * se)
+      }
       
-      stdd <- sd(dydx, na.rm = TRUE)
       
-      # confidence interval (totally overconfident, does not account for non-linearity)
-      conf <- c(mfx - 1.96 * stdd / sqrt(length(dydx)),
-                mfx + 1.96 * stdd / sqrt(length(dydx)))
       
       is_factor <- FALSE
     }
-  
-    # get intercept for plotting
-    X[[ p ]] <- 0
     
     # return the result
-    result <- list(mfx = mfx, conf = conf,
+    result <- list(mfx = mfx, 
+                   se = se,
+                   conf = conf,
                    dy = dy,
                    dx = dx,
                    x = pts,
                    yh0 = yh0,
+                   true_values = data.frame(x = X[[ p ]],
+                                            dx = dx_true,
+                                            y = yhat_true,
+                                            dy = dy_true,
+                                            stringsAsFactors = FALSE),
                    varname = p,
                    is_factor = is_factor)
     
@@ -296,15 +338,17 @@ plot.Mfx <- function(mfx, type = c("response", "derivative"), centered = FALSE, 
 summary.Mfx_list <- function(mfx_list, print = TRUE){
   tab <- do.call(rbind, lapply(mfx_list, function(x){
     data.frame(variable = paste0(rep(x$varname, length(x$mfx)), names(x$mfx)),
-              effect = x$mfx,
-              stringsAsFactors = FALSE)
+               effect = x$mfx,
+               stringsAsFactors = FALSE)
   }))
+  
+  se <- sapply(mfx_list, function(x) x$se)
   
   conf <- do.call(rbind, lapply(mfx_list, function(x) x$conf))
   
   colnames(conf) <- c("95_conf_low", "95_conf_high")
   
-  tab <- cbind(tab, conf)
+  tab <- cbind(tab, se = se, t_stat = tab$effect / se, conf)
   
   if(print){
     print(tab)
@@ -558,9 +602,9 @@ FitLasso <- function(y, x, family = "binomial", ...){
   glmnet::glmnet(y = y, x = as.matrix(x), family = family)
 }
 
-PredictLasso <- function(object, newdata, type = "response", col_out = 1){
+PredictLasso <- function(object, newdata, type = "response"){
   out <- predict(object, as.matrix(newdata), type = type)
-  out[ , col_out ]
+  out[ , ncol(out) ]
 }
 
 # random forest
