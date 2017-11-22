@@ -124,7 +124,7 @@ FitNn <- function(y, x, activation) {
 }
 
 nn_linear <- FitNn(y = X$y_linear, x = X[ , grep("^x", colnames(X), value = T) ],
-                   activation = "relu")
+                   activation = "linear")
 
 nn_logit <- FitNn(y = X$y_logit, x = X[ , grep("^x", colnames(X), value = T) ],
                   activation = "sigmoid")
