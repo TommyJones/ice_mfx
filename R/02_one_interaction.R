@@ -220,5 +220,24 @@ mfx_nn_logit <- CalcMfx(object = nn_logit,
                         predictors = grep("^x", colnames(X_test), value = T),
                         cpus = 1)
 
+### Calc Model Performance -----------------------------------------------------
+# Calculate accuracies for comparison
+linear_eval <- list(baseline = CalcR2(y = X_test$y_linear,
+                                      yhat = predict(model_linear, X_test)),
+                    lasso = CalcR2(y = X_test$y_linear,
+                                   yhat = PredictLasso(model_linear_all, X_test[ , grep("^x", names(X))])),
+                    rf = CalcR2(y = X_test$y_linear,
+                                yhat = PredictRf(rf_linear, X_test)),
+                    nn = CalcR2(y = X_test$y_linear,
+                                yhat = PredictNn(nn_linear, X_test[, grep("^x", names(X_test))])))
+
+logit_eval <- list(baseline = CalcClassificationStats(predict(model_logit, X_test, "response"),
+                                                      X_test$y_logit),
+                   lasso = CalcClassificationStats(PredictLasso(model_logit_all, X_test[ , grep("^x", names(X))]),
+                                                   X_test$y_logit),
+                   rf = CalcClassificationStats(PredictRf(rf_logit, X_test),
+                                                X_test$y_logit),
+                   nn = CalcClassificationStats(PredictNn(nn_logit, X_test[ , grep("^x", names(X))]),
+                                                X_test$y_logit))
 save.image("data_derived/one_interaction.RData")
 
