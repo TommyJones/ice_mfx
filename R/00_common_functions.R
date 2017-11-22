@@ -295,7 +295,7 @@ plot.Mfx <- function(mfx, type = c("response", "derivative"), centered = FALSE, 
 
 summary.Mfx_list <- function(mfx_list, print = TRUE){
   tab <- do.call(rbind, lapply(mfx_list, function(x){
-    data.frame(variable = paste(rep(x$varname, length(x$mfx)), names(x$mfx)),
+    data.frame(variable = paste0(rep(x$varname, length(x$mfx)), names(x$mfx)),
               effect = x$mfx,
               stringsAsFactors = FALSE)
   }))
@@ -554,13 +554,13 @@ CalcR2 <- function(y, yhat) {
 
 ### Recyclable functions for fitting and predicting things ---------------------
 # lasso
-FitLasso <- function(y, x, family = "binomial"){
+FitLasso <- function(y, x, family = "binomial", ...){
   glmnet::glmnet(y = y, x = as.matrix(x), family = family)
 }
 
-PredictLasso <- function(object, newdata, type = "response"){
+PredictLasso <- function(object, newdata, type = "response", col_out = 1){
   out <- predict(object, as.matrix(newdata), type = type)
-  out[ , ncol(out)]
+  out[ , col_out ]
 }
 
 # random forest
