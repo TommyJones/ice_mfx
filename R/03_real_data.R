@@ -158,81 +158,10 @@ model_rf <- parallel::mclapply(cv, function(x){
   
 }, mc.cores = 4)
 
-# deep neural net
-library(magrittr)
-library("keras")
-
-FitNn <- function(y, x, activation = "sigmoid", epochs = 50) {
-  
-  x <- as.matrix(x)
-  y <- matrix(y, ncol = 1)
-  
-  net <- keras_model_sequential()
-  
-  net %>% 
-    layer_dense(units = 36, activation = activation, input_shape = ncol(x)) %>% 
-    layer_dropout(rate = 0.4) %>% 
-    # layer_dense(units = 27, activation = activation) %>% 
-    # layer_dropout(rate = 0.4) %>% 
-    layer_dense(units = 20, activation = activation) %>%
-    layer_dropout(rate = 0.4) %>%
-    layer_dense(units = 15, activation = activation) %>% 
-    layer_dropout(rate = 0.4) %>% 
-    # layer_dense(units = 11, activation = activation) %>% 
-    # layer_dropout(rate = 0.4) %>% 
-    layer_dense(units = 8, activation = activation) %>%
-    layer_dropout(rate = 0.4) %>%
-    # layer_dense(units = 6, activation = activation) %>% 
-    # layer_dropout(rate = 0.4) %>% 
-    # layer_dense(units = 4, activation = activation) %>% 
-    # layer_dropout(rate = 0.4) %>% 
-    layer_dense(units = ncol(y), activation = "sigmoid")
-  
-  # summary(net)
-  
-  net %>% compile(
-    loss = 'binary_crossentropy',
-    optimizer = optimizer_rmsprop(),
-    metrics = c('accuracy')
-  )
-  
-  history <- net %>% fit(
-    x = x, y = y, 
-    epochs = epochs, batch_size = 128, 
-    validation_split = 0.2
-  )
-  
-  net
-}
-
-PredictNn <- function(object, newdata) {
-  # re-calculating interactions for ICE plots
-  # newdata <- RePrep(newdata)
-  
-  as.numeric(predict(object, as.matrix(newdata)))
-}
-
-model_nn <- lapply(cv, function(x){
-  samp <- Resample(x$training, csdata[ x$training, "ratwgt2" ])
-  
-  X <- csdata[ samp , setdiff(names(csdata), c("mais3pl", "ratwgt2")) ]
-  y <- csdata[ samp, "mais3pl" ]
-  
-  model <- FitNn(y = y, x = X, activation = "relu", epochs = 30)
-  
-  samp <- Resample(x$test, csdata[ x$test, "ratwgt2" ])
-
-    p <- PredictNn(model, csdata[ samp , colnames(X) ])
-  
-  result <- CalcClassificationStats(predicted_probabilities = p,
-                                    true_values = csdata[ samp , "mais3pl" ])
-  
-})
 
 # aggregate results into a list
 model_accuracy <- list(lasso = model_lasso,
-                       rf = model_rf,
-                       nn = model_nn)
+                       rf = model_rf)
 
 ### Get final models for each type ---------------------------------------------
 
@@ -273,18 +202,7 @@ mfx_rf <- CalcMfx(object = model_rf,
                   predictors = setdiff(names(X_test), c("mais3pl", "ratwgt2")))
 
 
-# deep neural net
-model_nn <- FitNn(y = X_training$mais3pl, 
-                  x = X_training[ , setdiff(names(X_training), c("mais3pl", "ratwgt2"))],
-                  activation = "relu")
-
-mfx_nn <- CalcMfx(object = model_nn, 
-                  X = X_test[ , setdiff(names(X_test), c("mais3pl", "ratwgt2")) ],
-                  pred_fun = PredictNn,
-                  predictors = setdiff(names(X_test), c("mais3pl", "ratwgt2")),
-                  cpus = 1)
-
 save(model_accuracy, 
-     model_lasso, model_rf, model_nn, 
-     mfx_lasso, mfx_rf, mfx_nn,
+     model_lasso, model_rf, 
+     mfx_lasso, mfx_rf,
      file = "data_derived/real_data.RData")
