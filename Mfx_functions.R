@@ -27,21 +27,63 @@
 #' then the result is of class \code{Mfx}. If greater than 1, the result is of
 #' class \code{Mfx_list}, each element of which is of class \code{Mfx}. An object
 #' of class \code{Mfx} has the following slots:
-#' 
+#' @slot mfx the calculated marginal effect
+#' @slot se the standard error of the calculated marginal effect
+#' @slot conf a 95% confidence interval around the effect
+#' @slot dy a vector of changes in the predicted value
+#' @slot dx a vector of changes in the predictor (set by \code{max_pts})
+#' @slot x the predictor vector set by \code{max_pts}
+#' @slot yh0 inital prediction corresponding to the first value of \code{x}
+#' @slot true_values \code{data.frame} with values for \code{dx}, \code{dy},
+#' and predictions for the actual data points.
+#' @slot varname the name of the predictor for which a marginal effect has been
+#' calculated
 #' 
 #' @examples
-#' data(mtcars)
+#' # examples coming soon
 #'
-#' folds <- CreateKFolds(data = mtcars, k = 10)
+#' 
 #' @export
 CalcMfx <- function(object, X, pred_fun = predict, predictors = colnames(X), 
                     max_pts = 100, dydx_mean = FALSE, ...){
   
   ### Check consistency of inputs ----
-  # TODO
+  
+  # Is X a data.frame?
+  if (class(X) != "data.frame")
+    stop("X must be of class data.frame")
+  
+  # Do I have any predictors that aren't in X ?
+  if (sum(! predictors %in% colnames(X)) > 0)
+    stop("predictors must be in colnames(X)")
+  
+  # Any non-numeric predictor variables?
+  if (length(predictors) == 1) {
+    if (class(X[[ predictors ]]) == "factor")
+      stop("CalcMfx can only handle numeric predictors. If you have a categorical
+           predictor, use Factor2Binary to encode a k class factor into k
+           binary variables and re-fit your model.")
+    
+    if (class(X[[ predictors ]]) != "numeric")
+      stop("CalcMfx can only handle numeric predictors.")
+    
+  } else {
+    classes <- sapply(X[, predictors], class)
+    
+    if (sum(classes == "factor") > 0)
+      stop("CalcMfx can only handle numeric predictors. If you have a categorical
+           predictor, use Factor2Binary to encode a k class factor into k
+           binary variables and re-fit your model.")
+    
+    if (sum(classes == "numeric") < length(classes))
+      stop("CalcMfx can only handle numeric predictors.")
+    
+  }
   
   
   ### Gets to calculating! ----
+  
+  # If you have more than one predictor, do a recursive loop for each one
   if (length(predictors) > 1) {
     
     result <- textmineR::TmParallelApply(predictors, function(p){
@@ -53,16 +95,15 @@ CalcMfx <- function(object, X, pred_fun = predict, predictors = colnames(X),
     
     class(result) <- "Mfx_list"
     
-  } else {
+  } else { # if you have only one, do the calculations
     
     p <- predictors
     
     # get the sequence to iterate over
-    if (is.factor(X[[ p ]])) {
-      
-      pts <- levels(X[[ p ]])
-      
-    } else if (is.na(max_pts)) {
+    if (is.na(max_pts) | length(unique(X[[ p ]])) < 10) { 
+      # if you want to use all the data points, or
+      # if you have fewer than 10 unique values in the data (assumed categorical
+      # or binary)
       
       pts <- sort(unique(X[[ p ]]))
       
@@ -70,10 +111,11 @@ CalcMfx <- function(object, X, pred_fun = predict, predictors = colnames(X),
       
       pts <- seq(min(X[[ p ]]), max(X[[ p ]]), length.out = max_pts)
       
-      # add a lower bound so we can get non-infinate values for
-      # delta x and delta y at the bottom
-      pts <- c(pts[ 1 ] - mean(diff(pts)), pts)
     }
+    
+    # add a lower bound so we can get non-infinate values for
+    # delta x and delta y at the bottom
+    pts <- c(pts[ 1 ] - mean(diff(pts)), pts)
     
     # get predictions for each point in the sequence
     yhat <- lapply(pts, function(point){
@@ -93,97 +135,55 @@ CalcMfx <- function(object, X, pred_fun = predict, predictors = colnames(X),
     yh0 <- yhat[ 1 , ]
     
     # get the derivative
-    if (is.factor(X[[ p ]])) {
+    
+    # dy/dx of curves
+    dy <- apply(yhat, 2, function(y) c(NA, diff(y)))
+    
+    dx <- c(NA, diff(pts))
+    
+    dydx <- dy / dx
+    
+    # dy/dx of true values
+    small_x <- sapply(X[[ p ]], function(x) max(pts[ pts < x ], na.rm = T))
+    
+    dx_true <- X[[ p ]] - small_x
+    
+    X_new <- X
+    X_new[[ p ]] <- small_x
+    
+    yhat_true <- pred_fun(object, X)
+    
+    dy_true <- yhat_true - pred_fun(object, X_new)
+    
+    dydx_true <- dy_true / dx_true
+    
+    # get the mfx
+    if (dydx_mean) {
+      # If you want to use mean values of the curves
+      mfx <- mean(dydx, na.rm = TRUE)
       
-      warning("Factor detected. CalcMfx for factors is in prototype. 
-              I have reason to believe it doesn't calculate the right thing.
-              Caveat emptor!")
+      stdd <- sd(dydx, na.rm = TRUE)
       
-      ### More research is needed to get factors right...
-      # since each level of p represents a binary variable, I think I can just
-      # take rowMeans of yhat to get the marginal effect. But I'm probably wrong
-      
-      # dy <- yhat
-      
-      dy <- apply(yhat, 2, function(y){
-        ans <- numeric(length(y))
-        
-        for (j in seq_along(ans)) {
-          ans[ j ] <- y[ j ] - mean(y[ -j ])
-        }
-        ans
-      })
-      
-      dx <- rep(1, length(pts))
-      
-      dydx <- dy
-      
-      mfx <- rowMeans(dydx, na.rm = TRUE)
-      
-      stdd <- apply(dydx, 1, function(y) sd(y, na.rm = TRUE))
+      se <- stdd / sqrt(length(dydx))
       
       # confidence interval (totally overconfident, does not account for non-linearity)
-      conf <- cbind(mfx - 1.96 * stdd / sqrt(nrow(dydx)),
-                    mfx + 1.96 * stdd / sqrt(nrow(dydx)))
-      
-      names(mfx) <- levels(X[[ p ]])
-      rownames(conf) <- names(mfx)
-      
-      is_factor <- TRUE
-      
+      conf <- c(mfx - 1.96 * se,
+                mfx + 1.96 * se)
     } else {
-      # dy/dx of curves
-      dy <- apply(yhat, 2, function(y) c(NA, diff(y)))
-      
-      dx <- c(NA, diff(pts))
-      
-      dydx <- dy / dx
-      
+      # If you only want to consider values at actual data points
       # dy/dx of true values
-      small_x <- sapply(X[[ p ]], function(x) max(pts[ pts < x ], na.rm = T))
       
-      dx_true <- X[[ p ]] - small_x
+      mfx <- mean(dydx_true, na.rm = TRUE)
       
-      X_new <- X
-      X_new[[ p ]] <- small_x
+      stdd <- sd(dydx_true, na.rm = TRUE)
       
-      yhat_true <- pred_fun(object, X)
+      se <- stdd / sqrt(length(dydx_true))
       
-      dy_true <- yhat_true - pred_fun(object, X_new)
-      
-      dydx_true <- dy_true / dx_true
-      
-      # get the mfx
-      if (dydx_mean) {
-        # If you want to use mean values of the curves
-        mfx <- mean(dydx, na.rm = TRUE)
-        
-        stdd <- sd(dydx, na.rm = TRUE)
-        
-        se <- stdd / sqrt(length(dydx))
-        
-        # confidence interval (totally overconfident, does not account for non-linearity)
-        conf <- c(mfx - 1.96 * se,
-                  mfx + 1.96 * se)
-      } else {
-        # If you only want to consider values at actual data points
-        # dy/dx of true values
-        
-        mfx <- mean(dydx_true, na.rm = TRUE)
-        
-        stdd <- sd(dydx_true, na.rm = TRUE)
-        
-        se <- stdd / sqrt(length(dydx_true))
-        
-        # confidence interval (totally overconfident, does not account for non-linearity)
-        conf <- c(mfx - 1.96 * se,
-                  mfx + 1.96 * se)
-      }
-      
-      
-      
-      is_factor <- FALSE
+      # confidence interval (totally overconfident, does not account for non-linearity)
+      conf <- c(mfx - 1.96 * se,
+                mfx + 1.96 * se)
     }
+    
     
     # return the result
     result <- list(mfx = mfx, 
@@ -198,8 +198,7 @@ CalcMfx <- function(object, X, pred_fun = predict, predictors = colnames(X),
                                             y = yhat_true,
                                             dy = dy_true,
                                             stringsAsFactors = FALSE),
-                   varname = p,
-                   is_factor = is_factor)
+                   varname = p)
     
     class(result) <- "Mfx"
     
@@ -207,4 +206,199 @@ CalcMfx <- function(object, X, pred_fun = predict, predictors = colnames(X),
   
   return(result)
   
+}
+
+
+#' plot method for objects of class \code{Mfx}
+#' @description plot method for objects of class \code{Mfx}
+#' @param mfx an object of class \code{Mfx}
+#' @param type one of either "response" or "derivative" depending on whether you
+#' want to plot ICE curves of the response or derivative function
+#' @param centered if \code{type = "response"} logical indicating whether or not
+#' to center the ICE curves to be 0 at their inital value
+#' @param ... other parameters to be passed to \code{\link[base]{plot}}
+#' @examples
+#' # TO DO
+#' @export
+plot.Mfx <- function(mfx, type = c("response", "derivative"), centered = FALSE, ...){
+  
+  ### check consistency of inputs ----
+  if (! type[ 1 ] %in% c("response", "derivative"))
+    stop("type must be one of 'response' or 'derivative'")
+  
+  if (class(mfx) != "Mfx")
+    stop("mfx must be of class Mfx")
+  
+  ### Declare a function to get our plot options in order ----
+  DoDotsProcedure <- function(...){
+    
+    dots <- list(...)
+    
+    if ( ! "ylim" %in% names(dots)) {
+      dots$ylim <- range(plotmat, na.rm = TRUE)
+    }
+    
+    if (! "col" %in% names(dots)) {
+      dots$col <- rgb(0,0,0,0.15)
+    }
+    
+    if (! "ylab" %in% names(dots)) {
+      dots$ylab <- ylab
+    }
+    
+    if (! "xlab" %in% names(dots)) {
+      dots$xlab <- mfx$varname
+    }
+    
+    if ("type" %in% names(dots)) {
+      warning("reverting type to type = 'l'")
+    }
+    
+    dots$type <- "l"
+    
+    dots
+  }
+  
+  ### Do calculations to get the chosen plot ----
+  if (type[ 1 ] == "response") {
+    plotmat <- rbind(mfx$yh0, mfx$dy[ -1 , ])
+    
+    plotmat <- apply(plotmat, 2, cumsum)
+    
+    ice_mean <- rowMeans(plotmat)
+    
+    # get intercept for mfx line
+    int <- ice_mean[ which.min(abs(mfx$x)) ] - mfx$mfx * mfx$x[ which.min(abs(mfx$x)) ]
+    
+    mfx_pred <- mfx$x * mfx$mfx + int
+    
+    ylab <- "partial y-hat"
+    
+    if (centered) {
+      
+      plotmat <- t(t(plotmat) - plotmat[ 1 , ])
+      
+      mfx_pred <- mfx_pred - mfx_pred[ 1 ]
+      
+      ylab <- paste(ylab, "(centered)")
+      
+    }
+    
+  } else {
+    
+    plotmat <- mfx$dy / mfx$dx
+    
+    mfx_pred <- rep(mfx$mfx, length(mfx$x))
+    
+    ylab <- "derivative of partial y-hat"
+  }
+  
+  # get our plot options straight
+  dots <- DoDotsProcedure(...)
+  
+  ### do the plotting ----
+  
+  # plot the ICE curves
+  dots$x <- mfx$x
+  dots$y <- plotmat[ , 1 ]
+  
+  do.call(plot, dots)
+  
+  for (j in 2:ncol(plotmat)) {
+    dots$y <- plotmat[ , j ]
+    do.call(lines, dots)
+  }
+  
+  # plot the curve predicted by the mfx
+  dots$y <- mfx_pred
+  dots$col <- "red"
+  dots$lty = 1
+  dots$lwd = 3
+  
+  do.call(lines, dots)
+  
+  
+  # plot the average ICE curve
+  dots$y <- rowMeans(plotmat)
+  dots$col <- "blue"
+  dots$lty = 2
+  dots$lwd = 3
+  
+  do.call(lines, dots)
+  
+}
+
+#' plot method for objects of class \code{Mfx_list}
+#' @description plot method for objects of class \code{Mfx_list}
+#' @param mfx_list an object of class \code{Mfx_list}
+#' @param ask do you want to pause and wait for user input between plots?
+#' @param ... other parameters to be passed to \code{plot.Mfx} or 
+#' \code{\link[base]{plot}}.
+#' @details
+#' \code{plot.Mfx_list} simply loops over every element of \code{mfx_list} and 
+#' callsj \code{plot.Mfx} for each element. It pauses between plots depending on
+#' the value passed to \code{ask}.
+#' @examples
+#' # TO DO
+#' @export
+plot.Mfx_list <- function(mfx_list, ask = TRUE, ...) {
+  if (class(mfx_list) != "mfx_list") {
+    check <- unique(sapply(mfx_list, class))
+    
+    if (length(check) != 1 | check[ 1 ] != "Mfx_list")
+      stop("mfx_list must be of class Mfx_list")
+  }
+  
+  # get current par setting
+  opar <- par()
+  
+  # run plots, pausing between
+  for (j in seq_along(mfx_list)) {
+    par(ask = ask)
+    plot(mfx_list[[ j ]], ...)
+  }
+  
+  # return par to previous setting
+  par(ask = opar$ask)
+  
+}
+
+#' summary method for objects of class \code{Mfx_list}
+#' @description summary method for objects of class \code{Mfx_list}
+#' @param mfx_list an object of class \code{Mfx_list}
+#' @param print do you want to print the result to the console?
+#' @examples
+#' # TO DO
+#' @export
+summary.Mfx_list <- function(mfx_list, print = TRUE){
+  tab <- do.call(rbind, lapply(mfx_list, function(x){
+    data.frame(variable = paste0(rep(x$varname, length(x$mfx)), names(x$mfx)),
+               effect = x$mfx,
+               stringsAsFactors = FALSE)
+  }))
+  
+  se <- sapply(mfx_list, function(x) x$se)
+  
+  conf <- do.call(rbind, lapply(mfx_list, function(x) x$conf))
+  
+  colnames(conf) <- c("95_conf_low", "95_conf_high")
+  
+  tab <- cbind(tab, se = se, t_stat = tab$effect / se, conf)
+  
+  if(print){
+    print(tab)
+  } else{
+    tab
+  }
+}
+
+#' print method for objects of class \code{Mfx_list}
+#' @description print method for objects of class \code{Mfx_list}
+#' @param mfx_list an object of class \code{Mfx_list}
+#' @details simply calls \code{summary.Mfx_list} with option \code{print = TRUE}
+#' @examples
+#' # TO DO
+#' @export
+print.Mfx_list <- function(mfx_list){
+  summary(mfx_list, print = TRUE)
 }
