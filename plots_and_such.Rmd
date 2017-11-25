@@ -1,0 +1,338 @@
+---
+title: "CSI 777 Plots"
+author: "Thomas W. Jones"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, fig.width = 8, fig.height = 6, cache = TRUE)
+```
+
+## Simulation: No interactions
+
+```{r}
+
+rm(list = ls())
+
+source("R/00_common_functions.R")
+
+load("data_derived/no_interactions.RData")
+
+# Prepare charts
+linear_effects <- list(baseline = summary(mfx_linear, print = F),
+                       rf = summary(mfx_rf_linear, print = F),
+                       nn = summary(mfx_nn_linear, print = F))
+
+lin_plot <- rbind(baseline = linear_effects$baseline$effect,
+                  rf = linear_effects$rf$effect,
+                  nn = linear_effects$nn$effect)
+
+colnames(lin_plot) <- linear_effects[[ 1 ]]$variable
+
+barplot(lin_plot, beside = TRUE,
+        col = c("#66c2a5", "#fc8d62", "#8da0cb"),
+        main = "Simple Linear Simulation",
+        ylab = "Marginal Effect")
+
+legend("topleft",
+       legend = paste0(c("Baseline", "Random Forest", "Neural Network"), 
+                      " (", round(unlist(linear_eval), 3), ")"),
+       fill = c("#66c2a5", "#fc8d62", "#8da0cb"))
+
+
+logit_effects <- list(baseline = summary(mfx_logit, print = F),
+                       rf = summary(mfx_rf_logit, print = F),
+                       nn = summary(mfx_nn_logit, print = F))
+
+log_plot <- rbind(baseline = logit_effects$baseline$effect,
+                  rf = logit_effects$rf$effect,
+                  nn = logit_effects$nn$effect)
+
+colnames(log_plot) <- logit_effects[[ 1 ]]$variable
+
+barplot(log_plot, beside = TRUE,
+        col = c("#66c2a5", "#fc8d62", "#8da0cb"),
+        main = "Simple Logistic Simulation",
+        ylab = "Marginal Effect")
+
+legend("topleft",
+       legend = paste0(c("Baseline", "Random Forest", "Neural Network"),
+                      " (", round(sapply(logit_eval, function(x) x$auc), 3), ")"),
+       fill = c("#66c2a5", "#fc8d62", "#8da0cb"))
+
+```
+
+### Baseline Linear ICE Plots
+
+```{r}
+plot(mfx_linear, ask = FALSE, ylim = c(-40, 60), main = "Baseline Model")
+```
+
+### Random Linear Forest ICE Plots
+
+```{r}
+plot(mfx_rf_linear, ask = FALSE, ylim = c(-40, 60), main = "Random Forest")
+```
+
+### Neural Network Linear ICE Plots
+
+```{r}
+plot(mfx_nn_linear, ask = FALSE, ylim = c(-40, 60), main = "Neural Network")
+```
+
+### Baseline Logistic ICE Plots
+
+```{r}
+plot(mfx_logit, ask = FALSE, ylim = c(0, 1), 
+     main = "Baseline Model", centered = TRUE)
+```
+
+### Random Forest Logistic ICE Plots
+
+```{r}
+plot(mfx_rf_logit, ask = FALSE, ylim = c(0, 1), 
+     main = "Random Forest", centered = TRUE)
+```
+
+### Neural Network Logistic ICE Plots
+
+```{r}
+plot(mfx_nn_logit, ask = FALSE, ylim = c(0, 1), 
+     main = "Neural Network", centered = TRUE)
+```
+
+
+
+
+## Simulation: Interaction + Quadratic
+
+```{r}
+rm(list = ls())
+
+source("R/00_common_functions.R")
+
+load("data_derived/one_interaction.RData")
+
+# Linear
+linear_effects <- list(baseline = summary(mfx_linear, print = F),
+                       lasso = summary(mfx_linear_all, print = F),
+                       rf = summary(mfx_rf_linear, print = F),
+                       nn = summary(mfx_nn_linear, print = F))
+
+
+lin_plot <- merge(linear_effects[[ 1 ]][ , c("variable", "effect") ], 
+                  linear_effects[[ 2 ]][ , c("variable", "effect") ],
+                  by = "variable", all = TRUE)
+
+for( j in 3:length(linear_effects)) 
+  lin_plot <- merge(lin_plot,
+                    linear_effects[[ j ]][ , c("variable", "effect")],
+                    by = "variable", all = TRUE) 
+
+names(lin_plot)[ 2:ncol(lin_plot) ] <- c("baseline", "lasso", "rf", "nn")
+
+ln <- lin_plot$variable
+
+lin_plot <- t(lin_plot[ , 2:ncol(lin_plot) ])
+
+colnames(lin_plot) <- ln
+
+lin_plot <- lin_plot[ , linear_effects$lasso$variable ]
+
+barplot(lin_plot, beside = TRUE,
+        col = c("#66c2a5", "#fc8d62", "#8da0cb", "#e78ac3"),
+        main = "Linear Simulation with Interactions",
+        ylab = "Marginal Effect",
+        ylim = c(-3, 4))
+
+legend(list(x = 0, y = -0.05),
+       legend = paste0(c("Baseline", "Lasso", "Random Forest", "Neural Network"),
+                       " (", round(unlist(linear_eval), 3), ")"),
+       fill = c("#66c2a5", "#fc8d62", "#8da0cb", "#e78ac3"))
+
+# Logit
+logit_effects <- list(baseline = summary(mfx_logit, print = F),
+                       lasso = summary(mfx_logit_all, print = F),
+                       rf = summary(mfx_rf_logit, print = F),
+                       nn = summary(mfx_nn_logit, print = F))
+
+
+log_plot <- merge(logit_effects[[ 1 ]][ , c("variable", "effect") ], 
+                  logit_effects[[ 2 ]][ , c("variable", "effect") ],
+                  by = "variable", all = TRUE)
+
+for( j in 3:length(logit_effects)) 
+  log_plot <- merge(log_plot,
+                    logit_effects[[ j ]][ , c("variable", "effect")],
+                    by = "variable", all = TRUE) 
+
+names(log_plot)[ 2:ncol(log_plot) ] <- c("baseline", "lasso", "rf", "nn")
+
+ln <- log_plot$variable
+
+log_plot <- t(log_plot[ , 2:ncol(log_plot) ])
+
+colnames(log_plot) <- ln
+
+log_plot <- log_plot[ , logit_effects$lasso$variable ]
+
+barplot(log_plot, beside = TRUE,
+        col = c("#66c2a5", "#fc8d62", "#8da0cb", "#e78ac3"),
+        main = "Logistic Simulation with Interactions",
+        ylab = "Marginal Effect",
+        ylim = c(-0.05, 0.15))
+
+legend("topleft",
+       legend = paste0(c("Baseline", "Lasso", "Random Forest", "Neural Network"),
+                       " (", round(sapply(logit_eval, function(x) x$auc), 3), ")"),
+       fill = c("#66c2a5", "#fc8d62", "#8da0cb", "#e78ac3"))
+```
+
+### Baseline Linear ICE Plots
+
+```{r}
+plot(mfx_linear, ask = FALSE, ylim = c(-200, 150), main = "Baseline Model")
+```
+
+### Lasso Linear ICE Plots
+
+```{r}
+plot(mfx_linear_all, ask = FALSE, ylim = c(-200, 150), main = "Lasso Model")
+
+```
+
+
+### Random Linear Forest ICE Plots
+
+```{r}
+plot(mfx_rf_linear, ask = FALSE, ylim = c(-200, 150), main = "Random Forest")
+```
+
+### Neural Network Linear ICE Plots
+
+```{r}
+plot(mfx_nn_linear, ask = FALSE, ylim = c(-200, 150), main = "Neural Network")
+```
+
+### Baseline Logistic ICE Plots
+
+```{r}
+plot(mfx_logit, ask = FALSE, ylim = c(0, 1), main = "Baseline Model")
+```
+
+### Lasso Linear ICE Plots
+
+```{r}
+plot(mfx_logit_all, ask = FALSE, ylim = c(0, 1), main = "Lasso Model")
+
+```
+
+### Random Forest Logistic ICE Plots
+
+```{r}
+plot(mfx_rf_logit, ask = FALSE, ylim = c(0, 1), main = "Random Forest")
+```
+
+### Neural Network Logistic ICE Plots
+
+```{r}
+plot(mfx_nn_logit, ask = FALSE, ylim = c(0, 1), main = "Neural Network")
+```
+
+## NASS/CDS Dataset
+
+```{r}
+
+rm(list = ls())
+
+source("R/00_common_functions.R")
+
+load("data_derived/real_data.RData")
+
+# Prepare charts
+effects <- list(lasso = summary(mfx_lasso, print = F),
+                       rf = summary(mfx_rf, print = F))
+
+log_plot <- rbind(lasso = effects$lasso$effect,
+                  rf = effects$rf$effect)
+
+colnames(log_plot) <- effects[[ 1 ]]$variable
+
+eval <- lapply(model_accuracy[ c("lasso", "rf")], function(x){
+  sapply(x, function(y) y$auc)
+})
+
+log_plot <- log_plot[ , order(colMeans(abs(log_plot))) ]
+
+log_plot <- log_plot[ , setdiff(colnames(log_plot), "bmode_Unk") ]
+
+par(mar = c(7, 4, 4, 2) + .1)
+
+barplot(log_plot, beside = TRUE,
+        col = c("#66c2a5", "#fc8d62"),
+        main = "Predicting Severe Injury",
+        ylab = "Marginal Effect",
+        las = 2)
+
+legend("topleft",
+       legend = paste0(c("Lasso", "Random Forest"),
+                      " (", round(sapply(eval, mean), 3), ")"),
+       fill = c("#66c2a5", "#fc8d62"))
+
+
+```
+
+### Lasso Linear ICE Plots
+
+```{r}
+plot(mfx_lasso, ask = FALSE, main = "Lasso Model", ylim = c(0, 1))
+
+```
+
+### Random Forest Logistic ICE Plots
+
+```{r}
+plot(mfx_rf, ask = FALSE, main = "Random Forest", ylim = c(0, 1))
+```
+
+### Compare lasso coefficients with mfx
+
+
+```{r}
+
+lasso_table <- broom::tidy(model_lasso)
+
+lasso_table <- lasso_table[ lasso_table$step == max(lasso_table$step) , ]
+
+result <- merge(lasso_table[ , c("term", "estimate") ],
+                effects$lasso[ , c("variable", "effect") ],
+                by.x = "term", by.y = "variable")
+
+result$estimate <- result$estimate / max(abs(result$estimate))
+
+result$effect <- result$effect / max(abs(result$effect))
+
+names(result)[ 2:3 ] <- c("coef", "mfx")
+
+rownames(result) <- result$term
+
+result <- result[ order(rowMeans(abs(result[ , 2:3 ]))) , ]
+
+result <- t(result[ , 2:3 ])
+
+par(mar = c(7, 4, 4, 2) + .1)
+
+barplot(result, beside = TRUE,
+        col = c("#66c2a5", "#fc8d62"),
+        main = "Coefficient vs. Marginal Effect\nin Lasso Model",
+        ylab = "Estimate / (Max Absolute Estimate)",
+        las = 2)
+
+legend("topleft",
+       legend = c("Coefficient", "Marginal Effect"),
+       fill = c("#66c2a5", "#fc8d62"))
+
+
+```
+
