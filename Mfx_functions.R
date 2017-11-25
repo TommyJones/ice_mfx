@@ -21,7 +21,7 @@
 #' @param ... arguments to be passed on to \code{textmineR}'s function
 #' code{\link[textmineR]{TmParallelApply}}.
 #'
-#' @return
+#' @return 
 #' Returns a \code{list} of class \code{Mfx} or \code{Mfx_list} depending on
 #' whether the \code{predictors} argument is of length 1 or greater. If length 1,
 #' then the result is of class \code{Mfx}. If greater than 1, the result is of
@@ -367,6 +367,14 @@ plot.Mfx_list <- function(mfx_list, ask = TRUE, ...) {
 #' @description summary method for objects of class \code{Mfx_list}
 #' @param mfx_list an object of class \code{Mfx_list}
 #' @param print do you want to print the result to the console?
+#' @return a \code{data.frame} with 6 columns: 
+#' @slot variable the name of the variable or predictor
+#' @slot effect the marginal effect of that variable on the outcome
+#' @slot se the standard error of the the effect
+#' @slot t_stat a t-statistic on the effect with a null hypothesis of 
+#' \code{effect = 0}
+#' @slot 95_conf_low the lower bound of a 95% confidence interval
+#' @slot 95_conf_high the upper bound of a 95% confidence interval
 #' @examples
 #' # TO DO
 #' @export
@@ -401,4 +409,34 @@ summary.Mfx_list <- function(mfx_list, print = TRUE){
 #' @export
 print.Mfx_list <- function(mfx_list){
   summary(mfx_list, print = TRUE)
+}
+
+#' easily convert a k-level factor variable to k binary variables
+#' @description
+#' @param y a factor variable with at least 2 levels
+#' @return a matrix of k binary columns, one corresponding to each level of
+#' the input, \code{y}
+#' @examples
+#' my_factor <- c("bob", "sharron", "bob", "alice", "alice")
+#' 
+#' my_factor <- as.factor(my_factor)
+#' 
+#' my_binary_matrix <- Factor2Binary(my_factor)
+#' 
+#' my_binary_matrix
+#' @export
+Factor2Binary <- function(y){
+  ynames <- levels(y)
+  
+  Y <- data.frame(y = y)
+  
+  Y <- model.matrix(~y, Y)
+  
+  colnames(Y) <- ynames
+  
+  # model.matrix always makes the first column all "1", fix this
+  Y[ , 1 ] <- as.numeric(rowSums(Y[ , -1 ]) == 0)
+  
+  
+  Y
 }
