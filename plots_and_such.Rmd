@@ -85,21 +85,21 @@ plot(mfx_nn_linear, ask = FALSE, ylim = c(-40, 60), main = "Neural Network")
 
 ```{r}
 plot(mfx_logit, ask = FALSE, ylim = c(0, 1), 
-     main = "Baseline Model", centered = TRUE)
+     main = "Baseline Model")
 ```
 
 ### Random Forest Logistic ICE Plots
 
 ```{r}
 plot(mfx_rf_logit, ask = FALSE, ylim = c(0, 1), 
-     main = "Random Forest", centered = TRUE)
+     main = "Random Forest")
 ```
 
 ### Neural Network Logistic ICE Plots
 
 ```{r}
 plot(mfx_nn_logit, ask = FALSE, ylim = c(0, 1), 
-     main = "Neural Network", centered = TRUE)
+     main = "Neural Network")
 ```
 
 
