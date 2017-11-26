@@ -39,6 +39,9 @@
 #' @slot varname the name of the predictor for which a marginal effect has been
 #' calculated
 #' 
+#' @details
+#' details coming soon
+#' 
 #' @examples
 #' # examples coming soon
 #'
@@ -189,9 +192,9 @@ CalcMfx <- function(object, X, pred_fun = predict, predictors = colnames(X),
     result <- list(mfx = mfx, 
                    se = se,
                    conf = conf,
-                   dy = dy[ 2:length(dy) ],
-                   dx = dx[ 2:length(dx) ],
-                   x = pts[ 2:length(pts) ],
+                   dy = dy[ -1 , ],
+                   dx = dx[ -1 ],
+                   x = pts[ -1 ],
                    yh0 = yh0,
                    true_values = data.frame(x = X[[ p ]],
                                             dx = dx_true,
@@ -217,6 +220,25 @@ CalcMfx <- function(object, X, pred_fun = predict, predictors = colnames(X),
 #' @param centered if \code{type = "response"} logical indicating whether or not
 #' to center the ICE curves to be 0 at their inital value
 #' @param ... other parameters to be passed to \code{\link[base]{plot}}
+#' @details marginal effects are plotted using individual conditional expectation
+#' (ICE) curves in the flavor of \code{\link[ICEbox]{ice}}. The (default) gray 
+#' curves are ICE curves. The green dashed curve is the mean curve. The red solid
+#' line is the linear projection given by the marginal effect. 
+#' 
+#' If \code{centered = TRUE}, the curves are centered at their initial values 
+#' where \code{x = min(x)}.
+#' 
+#' If \code{type = "derivative"}, the derivatives of ICE curves are plotted. There
+#' is no \code{centered = TRUE} analogue.
+#' 
+#' Points are also plotted. Here, the points come from actual data, whereas the
+#' curves come from a simulated range. As a result, there is no guarantee the 
+#' ranges of the curves will correspond to the ranges of points. If \code{centered = TRUE}, the 
+#' points are subtracted from the initial value given in \code{mfx$yh0}. Since
+#' these won't necessarily align, \code{mfx$true_values$y} is divided into quantiles
+#' such that the j-th value of \code{mfx$yh0} corresponds to the j-th quantile
+#' of \code{mfx$true_values$y}.
+#' 
 #' @examples
 #' # TO DO
 #' @export
@@ -284,7 +306,17 @@ plot.Mfx <- function(mfx, type = c("response", "derivative"), centered = FALSE, 
       plotmat <- t(t(plotmat) - plotmat[ 1 , ])
       
       # if the lines are centered, I can't center the points
-      plotpoints$y <- NA
+      # plotpoints$y <- NA
+      
+      plotpoints <- by(plotpoints, 
+                       INDICES = quantile(plotpoints$y, seq(0, 1, length = length(mfx$yh0))),
+                       function(x) x)
+      
+      for (j in seq_along(plotpoints)) {
+        plotpoints[[ j ]]$y <- plotpoints[[ j ]]$y - mfx$yh0[ j ]
+      }
+      
+      plotpoints <- do.call(rbind, plotpoints)
       
       mfx_pred <- mfx_pred - mfx_pred[ 1 ]
       
@@ -292,7 +324,11 @@ plot.Mfx <- function(mfx, type = c("response", "derivative"), centered = FALSE, 
       
     }
     
-  } else {
+  } else { # I assume you mean derivative
+    
+    if (centered)
+      message("Warning, centered = TRUE has no meaning for derivative. Curve
+              will not be centered.")
     
     plotmat <- mfx$dy / mfx$dx
     
