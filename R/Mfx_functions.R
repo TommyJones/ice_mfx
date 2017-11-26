@@ -64,7 +64,7 @@ CalcMfx <- function(object, X, pred_fun = predict, predictors = colnames(X),
            predictor, use Factor2Binary to encode a k class factor into k
            binary variables and re-fit your model.")
     
-    if (class(X[[ predictors ]]) != "numeric")
+    if (! class(X[[ predictors ]]) %in% c("numeric", "integer"))
       stop("CalcMfx can only handle numeric predictors.")
     
   } else {
@@ -75,7 +75,7 @@ CalcMfx <- function(object, X, pred_fun = predict, predictors = colnames(X),
            predictor, use Factor2Binary to encode a k class factor into k
            binary variables and re-fit your model.")
     
-    if (sum(classes == "numeric") < length(classes))
+    if (sum(classes %in% c("numeric", "integer")) < length(classes))
       stop("CalcMfx can only handle numeric predictors.")
     
   }
@@ -132,7 +132,7 @@ CalcMfx <- function(object, X, pred_fun = predict, predictors = colnames(X),
     yhat <- do.call(rbind, yhat)
     
     # store a variable used for plot method 
-    yh0 <- yhat[ 1 , ]
+    yh0 <- yhat[ 2 , ] # 2 because we drop our added inital value from before
     
     # get the derivative
     
@@ -160,11 +160,11 @@ CalcMfx <- function(object, X, pred_fun = predict, predictors = colnames(X),
     # get the mfx
     if (dydx_mean) {
       # If you want to use mean values of the curves
-      mfx <- mean(dydx, na.rm = TRUE)
+      mfx <- mean(dydx[ 2:length(dydx) ], na.rm = TRUE)
       
-      stdd <- sd(dydx, na.rm = TRUE)
+      stdd <- sd(dydx[ 2:length(dydx) ], na.rm = TRUE)
       
-      se <- stdd / sqrt(length(dydx))
+      se <- stdd / sqrt(length(dydx) - 1)
       
       # confidence interval (totally overconfident, does not account for non-linearity)
       conf <- c(mfx - 1.96 * se,
@@ -189,9 +189,9 @@ CalcMfx <- function(object, X, pred_fun = predict, predictors = colnames(X),
     result <- list(mfx = mfx, 
                    se = se,
                    conf = conf,
-                   dy = dy,
-                   dx = dx,
-                   x = pts,
+                   dy = dy[ 2:length(dy) ],
+                   dx = dx[ 2:length(dx) ],
+                   x = pts[ 2:length(pts) ],
                    yh0 = yh0,
                    true_values = data.frame(x = X[[ p ]],
                                             dx = dx_true,
@@ -239,7 +239,7 @@ plot.Mfx <- function(mfx, type = c("response", "derivative"), centered = FALSE, 
     }
     
     if (! "col" %in% names(dots)) {
-      dots$col <- rgb(0,0,0,0.15)
+      dots$col <- rgb(0,0,0,0.05)
     }
     
     if (! "ylab" %in% names(dots)) {
@@ -267,6 +267,11 @@ plot.Mfx <- function(mfx, type = c("response", "derivative"), centered = FALSE, 
     
     ice_mean <- rowMeans(plotmat)
     
+    plotpoints <- data.frame(x = mfx$true_values$x,
+                             y = mfx$true_values$y,
+                             stringsAsFactors = FALSE)
+    
+      
     # get intercept for mfx line
     int <- ice_mean[ which.min(abs(mfx$x)) ] - mfx$mfx * mfx$x[ which.min(abs(mfx$x)) ]
     
@@ -277,6 +282,9 @@ plot.Mfx <- function(mfx, type = c("response", "derivative"), centered = FALSE, 
     if (centered) {
       
       plotmat <- t(t(plotmat) - plotmat[ 1 , ])
+      
+      # if the lines are centered, I can't center the points
+      plotpoints$y <- NA
       
       mfx_pred <- mfx_pred - mfx_pred[ 1 ]
       
@@ -289,6 +297,10 @@ plot.Mfx <- function(mfx, type = c("response", "derivative"), centered = FALSE, 
     plotmat <- mfx$dy / mfx$dx
     
     mfx_pred <- rep(mfx$mfx, length(mfx$x))
+    
+    plotpoints <- data.frame(x = mfx$true_values$x,
+                             y = mfx$true_values$dy / mfx$true_values$dx,
+                             stringsAsFactors = FALSE)
     
     ylab <- "derivative of partial y-hat"
   }
@@ -308,21 +320,31 @@ plot.Mfx <- function(mfx, type = c("response", "derivative"), centered = FALSE, 
     dots$y <- plotmat[ , j ]
     do.call(lines, dots)
   }
+
+  # plot points of actual values
+  dots$x <- plotpoints$x
+  dots$y <- plotpoints$y
+  dots$pch <- 19
+  dots$type <- "p"
+  dots$col <- "black"
+  do.call(points, dots)
   
   # plot the curve predicted by the mfx
+  dots$type = "l"
+  dots$x <- mfx$x
   dots$y <- mfx_pred
-  dots$col <- "red"
+  dots$col <- "#fc8d62"
   dots$lty = 1
-  dots$lwd = 3
+  dots$lwd = 5
   
   do.call(lines, dots)
   
   
   # plot the average ICE curve
   dots$y <- rowMeans(plotmat)
-  dots$col <- "blue"
+  dots$col <- "#1b9e77"
   dots$lty = 2
-  dots$lwd = 3
+  dots$lwd = 5
   
   do.call(lines, dots)
   
@@ -342,10 +364,10 @@ plot.Mfx <- function(mfx, type = c("response", "derivative"), centered = FALSE, 
 #' # TO DO
 #' @export
 plot.Mfx_list <- function(mfx_list, ask = TRUE, ...) {
-  if (class(mfx_list) != "mfx_list") {
+  if (class(mfx_list) != "Mfx_list") {
     check <- unique(sapply(mfx_list, class))
     
-    if (length(check) != 1 | check[ 1 ] != "Mfx_list")
+    if (length(check) != 1 | check[ 1 ] != "Mfx")
       stop("mfx_list must be of class Mfx_list")
   }
   
