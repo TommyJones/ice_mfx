@@ -190,7 +190,7 @@ model_lasso <- FitLasso(y = X_training$mais3pl,
 mfx_lasso <- CalcMfx(object = model_lasso, 
                      X = X_test[ , setdiff(names(X_test), c("mais3pl", "ratwgt2")) ],
                      pred_fun = PredictLasso,
-                     predictors = setdiff(names(X_test), c("mais3pl", "ratwgt2")))
+                     predictors = setdiff(names(X_test), c("mais3pl", "ratwgt2", "bmode_Unk")))
 
 # random forest
 model_rf <- randomForest::randomForest(y = as.factor(X_training$mais3pl), 
@@ -199,7 +199,7 @@ model_rf <- randomForest::randomForest(y = as.factor(X_training$mais3pl),
 mfx_rf <- CalcMfx(object = model_rf, 
                   X = X_test[ , setdiff(names(X_test), c("mais3pl", "ratwgt2")) ],
                   pred_fun = PredictRf,
-                  predictors = setdiff(names(X_test), c("mais3pl", "ratwgt2")))
+                  predictors = setdiff(names(X_test), c("mais3pl", "ratwgt2", "bmode_Unk")))
 
 
 save(model_accuracy, 

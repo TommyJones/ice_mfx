@@ -58,12 +58,14 @@ PredictLogistic <- function(object, newdata){
 mfx_logit <- CalcMfx(object = model_logit, 
                      X = X_test,
                      pred_fun = PredictLogistic, 
-                     predictors = c("x1", "x2", "x3"))
+                     predictors = c("x1", "x2", "x3"),
+                     dydx_mean = FALSE)
 
 mfx_linear <- CalcMfx(object = model_linear, 
                       X = X_test,
                       pred_fun = predict, 
-                      predictors = c("x1", "x2", "x3"))
+                      predictors = c("x1", "x2", "x3"),
+                      dydx_mean = FALSE)
 
 ### Create Random Forest logistic and linear models ----------------------------
 rf_linear <- randomForest::randomForest(y_linear ~ x1 + x2 + x3,
@@ -80,12 +82,14 @@ PredictRfBinom <- function(object, newdata){
 mfx_rf_logit <- CalcMfx(object = rf_logit, 
                         X = X_test,
                         pred_fun = PredictRfBinom,
-                        predictors = c("x1", "x2", "x3"))
+                        predictors = c("x1", "x2", "x3"),
+                        dydx_mean = FALSE)
 
 mfx_rf_linear <- CalcMfx(object = rf_linear, 
                          X = X_test,
                          pred_fun = predict,
-                         predictors = c("x1", "x2", "x3"))
+                         predictors = c("x1", "x2", "x3"),
+                         dydx_mean = FALSE)
 
 ### Create nerural network linear and logistic models --------------------------
 
@@ -143,12 +147,14 @@ mfx_nn_linear <- CalcMfx(object = nn_linear,
                          X = X_test[ , grep("^x", colnames(X), value = T) ], 
                          pred_fun = PredictNn,
                          predictors = grep("^x", colnames(X_test), value = T),
+                         dydx_mean = FALSE,
                          cpus = 1)
 
 mfx_nn_logit <- CalcMfx(object = nn_logit, 
                         X = X_test[ , grep("^x", colnames(X), value = T) ], 
                         pred_fun = PredictNn,
                         predictors = grep("^x", colnames(X_test), value = T),
+                        dydx_mean = FALSE,
                         cpus = 1)
 
 ### Calc Model Performance -----------------------------------------------------

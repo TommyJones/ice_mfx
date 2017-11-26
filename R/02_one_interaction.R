@@ -189,35 +189,43 @@ PredictNn <- function(object, newdata) {
 
 ### Get mfx from ICE curves ----------------------------------------------------
 mfx_linear <- CalcMfx(object = model_linear, X = X_test, pred_fun = PredictLinear,
-                      predictors = c("x1", "x2", "x3", "x1x3", "x2sq"))
+                      predictors = c("x1", "x2", "x3", "x1x3", "x2sq"),
+                      dydx_mean = FALSE)
 
 mfx_linear_all <- CalcMfx(object = model_linear_all, 
                           X = X_test[ , grep("^x", colnames(X_test), value = T) ], 
-                          pred_fun = PredictLasso)
+                          pred_fun = PredictLasso,
+                          dydx_mean = FALSE)
 
 mfx_logit <- CalcMfx(object = model_logit, X = X_test, pred_fun = PredictLogit,
-                     predictors = intersect(names(X_test), colnames(model_logit$x)))
+                     predictors = intersect(names(X_test), colnames(model_logit$x)),
+                     dydx_mean = FALSE)
 
 mfx_logit_all <- CalcMfx(object = model_logit_all, 
                          X = X_test[ , grep("^x", colnames(X_test), value = T) ], 
-                         pred_fun = PredictLasso)
+                         pred_fun = PredictLasso,
+                         dydx_mean = FALSE)
 
 mfx_rf_linear <- CalcMfx(object = rf_linear, X = X_test, pred_fun = PredictRf,
-                         predictors = grep("^x", colnames(X_test), value = T))
+                         predictors = grep("^x", colnames(X_test), value = T),
+                         dydx_mean = FALSE)
 
 mfx_rf_logit <- CalcMfx(object = rf_logit, X = X_test, pred_fun = PredictRf,
-                         predictors = grep("^x", colnames(X_test), value = T))
+                         predictors = grep("^x", colnames(X_test), value = T),
+                        dydx_mean = FALSE)
 
 mfx_nn_linear <- CalcMfx(object = nn_linear, 
                          X = X_test[ , grep("^x", colnames(X), value = T) ], 
                          pred_fun = PredictNn,
                         predictors = grep("^x", colnames(X_test), value = T),
+                        dydx_mean = FALSE,
                         cpus = 1)
 
 mfx_nn_logit <- CalcMfx(object = nn_logit, 
                         X = X_test[ , grep("^x", colnames(X), value = T) ], 
                         pred_fun = PredictNn,
                         predictors = grep("^x", colnames(X_test), value = T),
+                        dydx_mean = FALSE,
                         cpus = 1)
 
 ### Calc Model Performance -----------------------------------------------------
