@@ -12,9 +12,13 @@
 #' \code{predict} function will be tried.
 #' @param predictors a character vector of column names of \code{X} for which
 #' marginal effects are to be calculated
-#' @param max_pts integer of the maximum number of points to be used for 
-#' calculating ICE curves. If a predictor has fewer than \code{max_pts} unique
-#' values, then only the predictor's unique values will be used.
+#' @param max_pts an integer value or \code{NA}. If an integer, then \code{max_pts}
+#' number of values will be used to calculate marginal effects and ICE curves. 
+#' If \code{max_pts} is \code{NA}, then each predictor's unique values will be used. 
+#' @param min_pts a positive integer. Predictorswith fewer than \code{min_pts} 
+#' unique values will be evaluated only at their unique values, rather than 
+#' \code{max_pts} values. If you want to guarantee all points will be evaluated
+#' at \code{max_pts} values, set \code{min_pts} to 0.
 #' @param dydx_mean logical indicating whether to calculate the marginal effect
 #' based on the mean of the derivative of ICE curves. If \code{FALSE}, then
 #' the marginal effect is calculated at each actual observation then averaged.
@@ -48,9 +52,22 @@
 #' 
 #' @export
 CalcMfx <- function(object, X, pred_fun = predict, predictors = colnames(X), 
-                    max_pts = 100, dydx_mean = FALSE, ...){
+                    max_pts = 100, min_pts = 0, dydx_mean = FALSE, ...){
   
   ### Check consistency of inputs ----
+  
+  # are min_pts and max_pts within acceptable settings?
+  if (min_pts > max_pts) {
+    warning("min_pts cannot be greater than max_pts. 
+              Setting min_pts equal to max_pts.")
+    
+    min_pts <- max_pts
+  }
+  
+  if (is.infinite(max_pts)) {
+    stop("max_pts must be a finite value or NA")
+  }
+  
   
   # Is X a data.frame?
   if (class(X) != "data.frame")
@@ -103,18 +120,17 @@ CalcMfx <- function(object, X, pred_fun = predict, predictors = colnames(X),
     p <- predictors
     
     # get the sequence to iterate over
-    if (is.na(max_pts) | length(unique(X[[ p ]])) < 10) { 
-      # if you want to use all the data points, or
-      # if you have fewer than 10 unique values in the data (assumed categorical
-      # or binary)
-      
+    if (is.na(max_pts) | length(unique(X[[ p ]])) <= min_pts) { 
+      # if you want to use all unique data points or
+      # if you have fewer than min_pts unique values
+
       pts <- sort(unique(X[[ p ]]))
       
     } else {
-      
+      # all points to be evaluated at max_pts values
       pts <- seq(min(X[[ p ]]), max(X[[ p ]]), length.out = max_pts)
       
-    }
+    } 
     
     # add a lower bound so we can get non-infinate values for
     # delta x and delta y at the bottom
@@ -231,13 +247,8 @@ CalcMfx <- function(object, X, pred_fun = predict, predictors = colnames(X),
 #' If \code{type = "derivative"}, the derivatives of ICE curves are plotted. There
 #' is no \code{centered = TRUE} analogue.
 #' 
-#' Points are also plotted. Here, the points come from actual data, whereas the
-#' curves come from a simulated range. As a result, there is no guarantee the 
-#' ranges of the curves will correspond to the ranges of points. If \code{centered = TRUE}, the 
-#' points are subtracted from the initial value given in \code{mfx$yh0}. Since
-#' these won't necessarily align, \code{mfx$true_values$y} is divided into quantiles
-#' such that the j-th value of \code{mfx$yh0} corresponds to the j-th quantile
-#' of \code{mfx$true_values$y}.
+#' Points are also plotted. If you want a derivative or centered ICE curve, the 
+#' actual data points are adjusted and plotted on the lines as well.
 #' 
 #' @examples
 #' # TO DO
@@ -303,20 +314,9 @@ plot.Mfx <- function(mfx, type = c("response", "derivative"), centered = FALSE, 
     
     if (centered) {
       
+      plotpoints$y <- plotpoints$y - plotmat[ 1 , ]
+      
       plotmat <- t(t(plotmat) - plotmat[ 1 , ])
-      
-      # if the lines are centered, I can't center the points
-      # plotpoints$y <- NA
-      
-      plotpoints <- by(plotpoints, 
-                       INDICES = quantile(plotpoints$y, seq(0, 1, length = length(mfx$yh0))),
-                       function(x) x)
-      
-      for (j in seq_along(plotpoints)) {
-        plotpoints[[ j ]]$y <- plotpoints[[ j ]]$y - mfx$yh0[ j ]
-      }
-      
-      plotpoints <- do.call(rbind, plotpoints)
       
       mfx_pred <- mfx_pred - mfx_pred[ 1 ]
       
