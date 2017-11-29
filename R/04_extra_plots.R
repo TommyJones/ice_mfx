@@ -77,6 +77,33 @@ legend("topright", legend = names(eval), col = c("red", "blue"), lty = 1)
 
 dev.off()
 
-plot(mfx_lasso$delta_v, centered = T, main = "Lasso")
+png("output_charts_tables/real_data_roc.png", 
+    width = 8, height = 6, units = "in", res = 300)
 
+plot(0, ylim = c(0,1), xlim = c(0,1), col = "white",
+     ylab = "Sensitivity", xlab = "1 - Specificity")
+
+for(j in 1:10){
+  lines(model_accuracy[[ 1 ]][[ j ]]$roc, col = rgb(1,0,0,0.3))
+  lines(model_accuracy[[ 2 ]][[ j ]]$roc, col = rgb(0,0,1,0.3))
+}
+
+lines(Reduce("+", lapply(model_accuracy[[ 1 ]], function(x) x$roc)) / 10, 
+      col = rgb(1,0,0,1), lwd = 2)
+lines(Reduce("+", lapply(model_accuracy[[ 2 ]], function(x) x$roc)) / 10, 
+      col = rgb(0,0,1,1), lwd = 2)
+
+legend("topright", legend = names(eval), col = c("red", "blue"), lty = 1)
+
+dev.off()
+
+
+png("output_charts_tables/real_data_lasso_dv.png", 
+    width = 8, height = 6, units = "in", res = 300)
+plot(mfx_lasso$delta_v, centered = T, main = "Lasso")
+dev.off()
+
+png("output_charts_tables/real_data_rf_dv.png", 
+    width = 8, height = 6, units = "in", res = 300)
 plot(mfx_rf$delta_v, centered = T, main = "Random Forest")
+dev.off()
