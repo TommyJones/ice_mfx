@@ -41,6 +41,9 @@ legend("topleft",
        fill = c("#66c2a5", "#fc8d62", "#8da0cb"))
 
 
+knitr::kable(t(lin_plot), digits = 3)
+
+
 logit_effects <- list(baseline = summary(mfx_logit, print = F),
                        rf = summary(mfx_rf_logit, print = F),
                        nn = summary(mfx_nn_logit, print = F))
@@ -60,6 +63,9 @@ legend("topleft",
        legend = paste0(c("Baseline", "Random Forest", "Neural Network"),
                       " (", round(sapply(logit_eval, function(x) x$auc), 3), ")"),
        fill = c("#66c2a5", "#fc8d62", "#8da0cb"))
+
+knitr::kable(t(log_plot), digits = 3)
+
 
 ```
 
@@ -151,6 +157,9 @@ legend(list(x = 0, y = -0.05),
                        " (", round(unlist(linear_eval), 3), ")"),
        fill = c("#66c2a5", "#fc8d62", "#8da0cb", "#e78ac3"))
 
+knitr::kable(t(lin_plot), digits = 3)
+
+
 # Logit
 logit_effects <- list(baseline = summary(mfx_logit, print = F),
                        lasso = summary(mfx_logit_all, print = F),
@@ -187,6 +196,8 @@ legend("topleft",
        legend = paste0(c("Baseline", "Lasso", "Random Forest", "Neural Network"),
                        " (", round(sapply(logit_eval, function(x) x$auc), 3), ")"),
        fill = c("#66c2a5", "#fc8d62", "#8da0cb", "#e78ac3"))
+
+knitr::kable(t(log_plot), digits = 3)
 ```
 
 ### Baseline Linear ICE Plots
@@ -280,6 +291,20 @@ legend("topleft",
                       " (", round(sapply(eval, mean), 3), ")"),
        fill = c("#66c2a5", "#fc8d62"))
 
+# make a table of coefficients
+table_out <- lapply(effects, function(x) x[ , c("effect", "t_stat") ])
+
+# for (j in seq_along(table_out)) {
+#   colnames(table_out[[ j ]]) <- paste(names(table_out)[ j ], 
+#                                       colnames(table_out[[ j ]]),
+#                                       sep = "\n")
+# }
+
+table_out <- do.call(cbind, table_out)
+
+table_out <- table_out[ order(abs(table_out[ , 1 ]), decreasing = TRUE) , ]
+
+knitr::kable(table_out, digits = 3)
 
 ```
 
